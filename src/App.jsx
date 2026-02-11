@@ -15,14 +15,22 @@ const EXCHANGE_OPTIONS = [
   { code: ".SG", label: "Singapore", example: "D05.SG" },
 ];
 
-const GEO_OPTIONS = ["USA", "UK", "Germany", "France", "Ireland", "Global", "Uruguay", "Japan", "China", "Canada", "Netherlands", "Italy", "Other"];
-const SECTOR_OPTIONS = ["Index Fund", "Technology", "Energy", "Materials", "Industrials", "Healthcare", "Utilities", "Consumer Staples", "Consumer Discretionary", "Financials", "Real Estate", "Communication Services", "Cash", "Crypto", "Precious Metals", "Commodities", "Bonds"];
+const DEFAULT_GEOS = ["USA", "UK", "Global"];
+const DEFAULT_SECTORS = ["Technology", "Index Fund", "Energy"];
 const CURRENCY_OPTIONS = ["GBP", "USD", "EUR"];
 const TYPE_OPTIONS = ["Stock", "ETF", "Cash", "Crypto", "Gold", "Commodity", "Bond"];
 const NON_MARKET_TYPES = ["Cash", "Crypto", "Gold", "Commodity", "Bond"];
 
-const GEO_COLORS = { "USA": "#3b82f6", "UK": "#ef4444", "Germany": "#f59e0b", "France": "#8b5cf6", "Ireland": "#10b981", "Global": "#6366f1", "Uruguay": "#ec4899", "Japan": "#f43f5e", "China": "#dc2626", "Canada": "#14b8a6", "Netherlands": "#f97316", "Italy": "#22c55e", "Other": "#475569" };
-const SECTOR_COLORS = { "Index Fund": "#6366f1", "Technology": "#3b82f6", "Energy": "#f59e0b", "Materials": "#d97706", "Industrials": "#64748b", "Healthcare": "#10b981", "Utilities": "#06b6d4", "Consumer Staples": "#8b5cf6", "Consumer Discretionary": "#ec4899", "Financials": "#f97316", "Real Estate": "#84cc16", "Communication Services": "#a855f7", "Cash": "#22d3ee", "Crypto": "#f472b6", "Precious Metals": "#eab308", "Commodities": "#a3e635", "Bonds": "#38bdf8" };
+const COLOR_PALETTE = [
+  "#3b82f6", "#ef4444", "#f59e0b", "#8b5cf6", "#10b981", "#6366f1", "#ec4899",
+  "#f43f5e", "#14b8a6", "#f97316", "#22c55e", "#06b6d4", "#84cc16", "#a855f7",
+  "#d97706", "#64748b", "#22d3ee", "#f472b6", "#eab308", "#a3e635",
+];
+function hashColor(name) {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = Math.imul(31, h) + name.charCodeAt(i) | 0;
+  return COLOR_PALETTE[((h % COLOR_PALETTE.length) + COLOR_PALETTE.length) % COLOR_PALETTE.length];
+}
 const CLASS_COLORS = { "Equities": "#6366f1", "Cash": "#22d3ee", "Crypto": "#f472b6", "Gold": "#eab308", "Commodities": "#a3e635", "Bonds": "#38bdf8" };
 const getAssetClass = (type) => ({ Stock: "Equities", ETF: "Equities", Cash: "Cash", Crypto: "Crypto", Gold: "Gold", Commodity: "Commodities", Bond: "Bonds" }[type] || "Equities");
 
@@ -76,7 +84,7 @@ function mapSector(finnhubIndustry) {
   for (const [key, val] of Object.entries(INDUSTRY_TO_SECTOR)) {
     if (lower.includes(key.toLowerCase())) return val;
   }
-  return null;
+  return finnhubIndustry;
 }
 
 function mapCountry(countryCode) {
@@ -84,7 +92,7 @@ function mapCountry(countryCode) {
   return COUNTRY_MAP[countryCode.toUpperCase()] || countryCode;
 }
 
-function HoldingModal({ onClose, onSave, editing }) {
+function HoldingModal({ onClose, onSave, editing, sectorOptions, geoOptions }) {
   const defaults = editing ? {
     name: editing.name || "", ticker: editing.ticker || "", exchange: "",
     shares: editing.shares != null ? String(editing.shares) : "",
@@ -323,9 +331,10 @@ function HoldingModal({ onClose, onSave, editing }) {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
           <div>
             <label style={labelStyle}>Sector {lookupData?.hasName && (lookupData.data.sector || lookupData.data.industry) ? <span style={{ color: "#4ade80", fontWeight: 400, textTransform: "none" }}>(auto)</span> : ""}</label>
-            <select style={{ ...selectStyle, ...(lookupData?.hasName && (lookupData.data.sector || lookupData.data.industry) ? { boxShadow: "0 0 0 1px rgba(74,222,128,0.3)", background: "rgba(74,222,128,0.05)" } : {}) }} value={form.sector} onChange={e => set("sector", e.target.value)}>
-              {SECTOR_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
+            <input list="sector-options" style={{ ...inputStyle, ...(lookupData?.hasName && (lookupData.data.sector || lookupData.data.industry) ? { boxShadow: "0 0 0 1px rgba(74,222,128,0.3)", background: "rgba(74,222,128,0.05)" } : {}) }} value={form.sector} onChange={e => set("sector", e.target.value)} placeholder="e.g. Technology" />
+            <datalist id="sector-options">
+              {(sectorOptions || []).map(s => <option key={s} value={s} />)}
+            </datalist>
           </div>
           <div>
             <label style={labelStyle}>Industry {lookupData?.hasName && lookupData.data.industry ? <span style={{ color: "#4ade80", fontWeight: 400, textTransform: "none" }}>(auto)</span> : ""}</label>
@@ -335,9 +344,10 @@ function HoldingModal({ onClose, onSave, editing }) {
 
         <div style={{ marginBottom: 20 }}>
           <label style={labelStyle}>Geography {lookupData?.hasName && lookupData.data.country ? <span style={{ color: "#4ade80", fontWeight: 400, textTransform: "none" }}>(auto)</span> : ""}</label>
-          <select style={{ ...selectStyle, ...(lookupData?.hasName && lookupData.data.country ? { boxShadow: "0 0 0 1px rgba(74,222,128,0.3)", background: "rgba(74,222,128,0.05)" } : {}) }} value={form.geo} onChange={e => set("geo", e.target.value)}>
-            {GEO_OPTIONS.map(g => <option key={g} value={g}>{g}</option>)}
-          </select>
+          <input list="geo-options" style={{ ...inputStyle, ...(lookupData?.hasName && lookupData.data.country ? { boxShadow: "0 0 0 1px rgba(74,222,128,0.3)", background: "rgba(74,222,128,0.05)" } : {}) }} value={form.geo} onChange={e => set("geo", e.target.value)} placeholder="e.g. USA" />
+          <datalist id="geo-options">
+            {(geoOptions || []).map(g => <option key={g} value={g} />)}
+          </datalist>
         </div>
 
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
@@ -417,13 +427,13 @@ function PortfolioDashboard() {
   const geoData = useMemo(() => {
     const map = {};
     enrichedHoldings.forEach(h => { map[h.geo] = (map[h.geo] || 0) + h.value; });
-    return Object.entries(map).map(([name, value]) => ({ name, value, pct: ((value / totalValue) * 100).toFixed(1), color: GEO_COLORS[name] || "#475569" })).sort((a, b) => b.value - a.value);
+    return Object.entries(map).map(([name, value]) => ({ name, value, pct: ((value / totalValue) * 100).toFixed(1), color: hashColor(name) })).sort((a, b) => b.value - a.value);
   }, [enrichedHoldings, totalValue]);
 
   const sectorData = useMemo(() => {
     const map = {};
     enrichedHoldings.forEach(h => { map[h.sector] = (map[h.sector] || 0) + h.value; });
-    return Object.entries(map).map(([name, value]) => ({ name, value, pct: ((value / totalValue) * 100).toFixed(1), color: SECTOR_COLORS[name] || "#475569" })).sort((a, b) => b.value - a.value);
+    return Object.entries(map).map(([name, value]) => ({ name, value, pct: ((value / totalValue) * 100).toFixed(1), color: hashColor(name) })).sort((a, b) => b.value - a.value);
   }, [enrichedHoldings, totalValue]);
 
   const classData = useMemo(() => {
@@ -432,10 +442,22 @@ function PortfolioDashboard() {
     return Object.entries(map).map(([name, value]) => ({ name, value, pct: ((value / totalValue) * 100).toFixed(1), color: CLASS_COLORS[name] || "#475569" })).sort((a, b) => b.value - a.value);
   }, [enrichedHoldings, totalValue]);
 
+  const geoOptions = useMemo(() => {
+    const vals = new Set(DEFAULT_GEOS);
+    holdings.forEach(h => { if (h.geo) vals.add(h.geo); });
+    return [...vals].sort();
+  }, [holdings]);
+
+  const sectorOptions = useMemo(() => {
+    const vals = new Set(DEFAULT_SECTORS);
+    holdings.forEach(h => { if (h.sector) vals.add(h.sector); });
+    return [...vals].sort();
+  }, [holdings]);
+
   const sortedHoldings = useMemo(() => {
     let list = [...enrichedHoldings];
     if (filter !== "All") {
-      if (GEO_OPTIONS.includes(filter)) list = list.filter(h => h.geo === filter);
+      if (geoData.some(g => g.name === filter)) list = list.filter(h => h.geo === filter);
       else if (Object.keys(CLASS_COLORS).includes(filter)) list = list.filter(h => h.assetClass === filter);
       else list = list.filter(h => h.sector === filter);
     }
@@ -651,12 +673,12 @@ function PortfolioDashboard() {
                       <td style={{ padding: "11px 12px", fontSize: 13, textAlign: "right", fontWeight: 600, color: h.gainPct >= 0 ? "#34d399" : "#f87171" }}>{fmtPct(h.gainPct)}</td>
                       <td style={{ padding: "11px 12px", fontSize: 12, color: "#94a3b8" }}>
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                          <span style={{ width: 6, height: 6, borderRadius: "50%", background: SECTOR_COLORS[h.sector] || "#475569" }} />{h.sector}
+                          <span style={{ width: 6, height: 6, borderRadius: "50%", background: hashColor(h.sector) }} />{h.sector}
                         </span>
                       </td>
                       <td style={{ padding: "11px 12px", fontSize: 12, color: "#94a3b8" }}>
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                          <span style={{ width: 6, height: 6, borderRadius: "50%", background: GEO_COLORS[h.geo] || "#475569" }} />{h.geo}
+                          <span style={{ width: 6, height: 6, borderRadius: "50%", background: hashColor(h.geo) }} />{h.geo}
                         </span>
                       </td>
                       <td style={{ padding: "11px 12px", fontSize: 12, color: "#64748b", textAlign: "right" }}>{totalValue > 0 ? ((h.value / totalValue) * 100).toFixed(1) : 0}%</td>
@@ -815,7 +837,7 @@ function PortfolioDashboard() {
         <span style={{ fontSize: 11, color: "#475569" }}>Portfolio Dashboard v2</span>
       </div>
 
-      {showAddModal && <HoldingModal onClose={() => { setShowAddModal(false); setEditingHolding(null); }} onSave={handleSaveHolding} editing={editingHolding} />}
+      {showAddModal && <HoldingModal onClose={() => { setShowAddModal(false); setEditingHolding(null); }} onSave={handleSaveHolding} editing={editingHolding} sectorOptions={sectorOptions} geoOptions={geoOptions} />}
     </div>
   );
 }
