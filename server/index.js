@@ -148,6 +148,28 @@ app.get('/api/yahoo/lookup', async (req, res) => {
   }
 });
 
+// Yahoo Finance: FX rates (e.g. USDGBP=X, EURGBP=X)
+app.get('/api/yahoo/fx', async (req, res) => {
+  const pairs = [
+    { from: 'USD', to: 'GBP', symbol: 'USDGBP=X' },
+    { from: 'EUR', to: 'GBP', symbol: 'EURGBP=X' },
+  ];
+  const rates = { GBP: 1.0 };
+  try {
+    for (const { from, symbol } of pairs) {
+      try {
+        const quote = await yahooFinance.quote(symbol);
+        if (quote.regularMarketPrice > 0) {
+          rates[from] = quote.regularMarketPrice;
+        }
+      } catch (e) { /* skip failed pair */ }
+    }
+    return res.json(rates);
+  } catch (e) {
+    return res.status(502).json({ error: 'FX fetch failed' });
+  }
+});
+
 // SPA fallback — serve index.html for all non-API routes
 app.get('*', (req, res) => {
   if (req.path.startsWith('/api')) {

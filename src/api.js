@@ -57,6 +57,12 @@ export const yahoo = {
     throw new Error('Quotes fetch failed');
   },
 
+  async fx() {
+    const res = await fetch(`${API_BASE}/yahoo/fx`);
+    if (res.ok) return await res.json();
+    throw new Error('FX fetch failed');
+  },
+
   async lookup(symbol) {
     const res = await fetch(`${API_BASE}/yahoo/lookup?symbol=${encodeURIComponent(symbol)}`);
     if (res.ok) return await res.json();

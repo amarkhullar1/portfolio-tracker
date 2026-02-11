@@ -390,11 +390,11 @@ function PortfolioDashboard() {
     try { await storage.saveHoldings(h); } catch (e) { console.error('Save failed:', e); }
   }, []);
 
-  // Approximate FX rates (fallback)
-  const FX = { USD: 0.79, EUR: 0.86, GBP: 1.0 };
+  // FX rates — live from Yahoo Finance, with static fallbacks
+  const [fxRates, setFxRates] = useState({ USD: 0.79, EUR: 0.86, GBP: 1.0 });
 
   const getHoldingValue = (h) => {
-    const fx = FX[h.currency] || 1;
+    const fx = fxRates[h.currency] || 1;
     // Alt assets: use manualValue directly (with FX)
     if (NON_MARKET_TYPES.includes(h.type)) {
       if (h.manualValue) return h.manualValue * fx;
@@ -417,7 +417,7 @@ function PortfolioDashboard() {
       const gainPct = h.costBasis ? (gain / h.costBasis) * 100 : 0;
       return { ...h, value, gain, gainPct, assetClass: getAssetClass(h.type) };
     });
-  }, [holdings, livePrices]);
+  }, [holdings, livePrices, fxRates]);
 
   const totalValue = useMemo(() => enrichedHoldings.reduce((s, h) => s + h.value, 0), [enrichedHoldings]);
   const totalGain = useMemo(() => enrichedHoldings.reduce((s, h) => s + h.gain, 0), [enrichedHoldings]);
@@ -469,13 +469,17 @@ function PortfolioDashboard() {
     return list;
   }, [enrichedHoldings, sortBy, sortDir, filter]);
 
-  // Fetch live prices via Yahoo Finance
+  // Fetch live prices and FX rates via Yahoo Finance
   const fetchPrices = useCallback(async () => {
     const symbols = [...new Set(holdings.filter(h => h.finnhubSymbol).map(h => h.finnhubSymbol))];
     if (symbols.length === 0) { setFetchStatus("idle"); return; }
     setFetchStatus("loading");
     try {
-      const data = await yahoo.quotes(symbols);
+      const [data, fxData] = await Promise.all([
+        yahoo.quotes(symbols),
+        yahoo.fx().catch(() => null),
+      ]);
+      if (fxData) setFxRates(prev => ({ ...prev, ...fxData }));
       const prices = {};
       const failed = new Set();
       for (const sym of symbols) {
@@ -832,7 +836,7 @@ function PortfolioDashboard() {
       {/* Footer */}
       <div style={{ marginTop: 32, padding: "16px 0", borderTop: "1px solid rgba(255,255,255,0.06)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={{ fontSize: 11, color: "#475569" }}>
-          {Object.keys(livePrices).length > 0 ? `Live prices for ${Object.keys(livePrices).length} symbols via Yahoo Finance` : "Using manual prices"} · Values in GBP · FX: 1 USD ≈ £0.79, 1 EUR ≈ £0.86
+          {Object.keys(livePrices).length > 0 ? `Live prices for ${Object.keys(livePrices).length} symbols via Yahoo Finance` : "Using manual prices"} · Values in GBP · FX: 1 USD = £{fxRates.USD.toFixed(4)}, 1 EUR = £{fxRates.EUR.toFixed(4)}
         </span>
         <span style={{ fontSize: 11, color: "#475569" }}>Portfolio Dashboard v2</span>
       </div>
